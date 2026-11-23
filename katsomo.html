@@ -1,0 +1,785 @@
+<title>Jäniksen ja Ketun leffailta</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Young+Serif&display=swap">
+<style>
+/* Layout: one-screen cinema app. Kettu's stage fills the top, Jänis's emoji pad sits in the thumb zone;
+   on a landscape tablet they sit side by side. The timeline view puts both on one film-time axis.
+   Deliberately dark only: it is used in a dark room while a film plays. */
+:root {
+  --bg: #0d1412;          /* night, biased toward deep green */
+  --surface: #141d1a;
+  --surface-2: #1b2622;
+  --line: #27352f;
+  --fg: #eee4d1;          /* warm paper */
+  --muted: #9aa396;
+  --janis: #8cbcec;       /* Jänis 💙 */
+  --janis-soft: rgba(140, 188, 236, 0.15);
+  --kettu: #f0a057;       /* Kettu 🧡 */
+  --kettu-soft: rgba(240, 160, 87, 0.15);
+  --kettu-glow: rgba(240, 160, 87, 0.32);
+  --both: #e6cf86;        /* a moment we both reacted to */
+  --font-display: "Young Serif", Georgia, "Times New Roman", serif;
+  --font-ui: "Figtree", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-tc: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 15px/1.45 var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: 0.4; }
+:focus-visible { outline: 2px solid var(--janis); outline-offset: 2px; }
+.tc { font-family: var(--font-tc); font-variant-numeric: tabular-nums; }
+.gutter {
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+.app { min-height: 100%; display: flex; flex-direction: column; }
+
+/* Top bar */
+.bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.bar-in {
+  display: grid; align-items: center; gap: 6px 12px; padding-block: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "title menu" "clock views";
+}
+.title { grid-area: title; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.film {
+  font-family: var(--font-display); font-size: 19px; line-height: 1.2;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.state {
+  flex: none; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px;
+}
+.state[data-tila="kaynnissa"] { color: var(--fg); border-color: var(--muted); }
+.state[data-tila="tauko"] { color: var(--both); border-color: var(--both); }
+#clock { grid-area: clock; font-size: 18px; letter-spacing: 0.02em; }
+.views { grid-area: views; display: flex; gap: 2px; background: var(--surface); border-radius: 999px; padding: 3px; justify-self: end; }
+.views a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 5px 12px; border-radius: 999px; }
+.views a[aria-current="page"] { background: var(--surface-2); color: var(--fg); }
+.icon-btn {
+  grid-area: menu; justify-self: end; width: 40px; height: 40px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); font-size: 18px; line-height: 1;
+}
+.acts { grid-area: menu; justify-self: end; display: flex; gap: 6px; }
+#pauseTop[data-tila="tauko"] { color: var(--bg); background: var(--both); border-color: var(--both); }
+#pauseTop:disabled { opacity: 0.35; }
+@media (min-width: 680px) {
+  .bar-in { grid-template-columns: minmax(0, 1fr) auto auto auto; grid-template-areas: "title clock views menu"; }
+}
+
+/* Katsomo */
+.katsomo { flex: 1; display: grid; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+.stage {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 10px; padding-block: 12px 56px; text-align: center; min-height: 250px; overflow: hidden;
+}
+.presence { margin: 0; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.presence .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
+.presence.on { color: var(--fg); }
+.presence.on .dot { background: var(--kettu); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 var(--kettu-glow); } 50% { box-shadow: 0 0 0 6px rgba(240, 160, 87, 0); } }
+.note { margin: 0; font-size: 13px; color: var(--both); max-width: 34ch; }
+
+.kettu-now { position: relative; display: grid; justify-items: center; gap: 4px; margin-block: auto; }
+.glow {
+  position: absolute; left: 50%; top: 42%; width: 420px; height: 420px; max-width: 120vw;
+  transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, var(--kettu-glow) 0%, rgba(240, 160, 87, 0) 62%);
+}
+.big { position: relative; font-family: var(--font-emoji); font-size: clamp(64px, min(28vw, 13vh), 200px); line-height: 1.05; transition: opacity 0.6s; }
+.word { position: relative; margin: 0; font-family: var(--font-display); font-size: 22px; line-height: 1.25; min-height: 1.25em; max-width: 22ch; text-wrap: balance; }
+.when { position: relative; margin: 0; font-size: 13px; color: var(--kettu); min-height: 1.2em; }
+.kettu-now.idle .big { opacity: 0.32; }
+.kettu-now.idle .word { color: var(--muted); font-size: 18px; }
+.kettu-now.arrive .big { animation: arrive 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.kettu-now.arrive .glow { animation: glow 3.4s ease-out; }
+@keyframes arrive { 0% { transform: scale(0.55); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes glow { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+
+.trail { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.trail li { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 6px; border-radius: 999px; background: var(--kettu-soft); font-size: 12px; color: var(--muted); }
+.trail .e { font-family: var(--font-emoji); font-size: 17px; }
+
+.box { display: grid; justify-items: center; gap: 10px; max-width: 360px; }
+.box p { margin: 0; color: var(--muted); }
+.primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 26px;
+  border-radius: 999px; border: 0; background: var(--fg); color: var(--bg); font-weight: 600; font-size: 17px; text-decoration: none;
+}
+.kohta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; font-size: 13px; color: var(--muted); }
+.kohta input {
+  width: 7.5em; min-height: 38px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); font-family: var(--font-tc); font-variant-numeric: tabular-nums;
+}
+.kohta button, .ghost {
+  min-height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2);
+}
+
+.toast {
+  position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2;
+  display: flex; align-items: center; gap: 12px; white-space: nowrap;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 5px 5px 14px; font-size: 14px;
+}
+.toast .e { font-family: var(--font-emoji); }
+.toast button { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 0; background: var(--janis-soft); color: var(--janis); font-weight: 600; }
+.toast.err { border-color: var(--both); }
+
+/* Jänis's pad */
+.pad { background: var(--surface); border-top: 1px solid var(--line); padding-block: 12px max(16px, env(safe-area-inset-bottom, 0px)); }
+.pad-head { display: flex; justify-content: space-between; align-items: baseline; max-width: 560px; margin: 0 auto 8px; font-size: 12px; color: var(--muted); }
+.pad-head b { color: var(--janis); font-weight: 600; }
+.pad-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; max-width: 620px; margin-inline: auto; }
+.emo {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 54px; padding: 4px 2px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2);
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; transition: transform 0.08s;
+}
+.emo .e { font-family: var(--font-emoji); font-size: 25px; line-height: 1; }
+.emo .l { font-size: 10px; line-height: 1.2; color: var(--muted); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emo:active { transform: scale(0.93); }
+.emo.hit { box-shadow: inset 0 0 0 2px var(--janis); }
+@media (min-width: 480px) {
+  .pad-grid { gap: 8px; }
+  .emo { min-height: 62px; }
+  .emo .e { font-size: 29px; }
+  .emo .l { font-size: 11px; }
+}
+@media (max-height: 760px) and (orientation: portrait) {
+  .emo { min-height: 48px; }
+  .emo .e { font-size: 22px; }
+}
+
+/* Jänis's reactions rise from the bottom of the stage, the way video-call reactions do */
+.floats { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.fly {
+  position: absolute; bottom: 72px; font-family: var(--font-emoji); font-size: 40px; line-height: 1;
+  animation: fly 3.2s cubic-bezier(0.22, 0.61, 0.36, 1) forwards; will-change: transform, opacity;
+}
+@keyframes fly {
+  0% { transform: translate(-50%, 16px) scale(0.5); opacity: 0; }
+  10% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+  60% { opacity: 0.95; }
+  100% { transform: translate(calc(-50% + var(--sway, 0px)), var(--rise, -240px)) scale(1.05); opacity: 0; }
+}
+
+@media (min-width: 820px) and (orientation: landscape) {
+  .katsomo { grid-template-rows: none; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .pad { border-top: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; justify-content: center; }
+  .pad-head, .pad-grid { width: 100%; }
+  .pad-grid { gap: 8px; }
+  .emo { min-height: 84px; }
+  .emo .e { font-size: 36px; }
+  .emo .l { font-size: 12px; }
+  .fly { font-size: 52px; }
+}
+
+/* Menu sheet */
+.backdrop { position: fixed; inset: 0; z-index: 19; background: rgba(0, 0, 0, 0.55); }
+.sheet {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface);
+  border-top: 1px solid var(--line); border-radius: 20px 20px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.sheet-in { max-width: 560px; margin-inline: auto; padding-block: 14px 20px; display: grid; gap: 10px; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; }
+.sheet h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+.sheet .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sheet .row > button, .sheet .row > .ghost { min-height: 48px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); }
+.sheet .row.wide > button { flex: 1; }
+.sheet .row span { color: var(--muted); font-size: 14px; flex: 1 1 12em; }
+.switch { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; }
+.switch input { width: 20px; height: 20px; accent-color: var(--janis); }
+.danger { background: var(--both) !important; color: var(--bg); border-color: var(--both) !important; font-weight: 600; }
+.fine { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+
+.dim { position: fixed; inset: 0; z-index: 50; background: #000; opacity: 0.45; pointer-events: none; }
+
+/* Timeline */
+.aikajana { flex: 1; }
+.tl-in { max-width: 720px; margin-inline: auto; padding-block: 22px 48px; }
+.tl-head h1 { margin: 0 0 4px; font-family: var(--font-display); font-weight: 400; font-size: 28px; line-height: 1.2; text-wrap: balance; }
+.tl-sub { margin: 0 0 16px; color: var(--muted); }
+.tl-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 14px; }
+.tl-stats div { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.tl-stats dt { font-size: 12px; color: var(--muted); }
+.tl-stats dd { margin: 2px 0 0; font-size: 20px; font-weight: 600; }
+.tl-stats dd small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.tl-stats .s-j dt { color: var(--janis); }
+.tl-stats .s-k dt { color: var(--kettu); }
+.tl-stats .s-b dt { color: var(--both); }
+.lanes { display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); gap: 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-top: 18px; }
+.lanes .j { text-align: right; color: var(--janis); }
+.lanes .k { color: var(--kettu); }
+.tl { list-style: none; margin: 8px 0 0; padding: 0; position: relative; }
+.tl::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--line); }
+.tl-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); align-items: center; gap: 10px; padding-block: 5px; }
+.tl-t { justify-self: center; position: relative; z-index: 1; font-size: 12px; color: var(--muted); background: var(--bg); padding: 2px 7px; border-radius: 7px; }
+.tl-row.both .tl-t { background: var(--both); color: var(--bg); font-weight: 500; }
+.tl-j, .tl-k { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.tl-j { justify-content: flex-end; }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 10px; max-width: 100%; }
+.chip .e { font-family: var(--font-emoji); font-size: 22px; line-height: 1; }
+.chip .w { font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; }
+.tl-j .chip { background: var(--janis-soft); }
+.tl-k .chip { background: var(--kettu-soft); }
+.empty { color: var(--muted); text-align: center; margin: 28px auto 0; max-width: 32ch; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kettu-now.arrive .big, .kettu-now.arrive .glow, .presence.on .dot { animation: none; }
+  .fly { animation: fade 2s ease-out forwards; }
+  @keyframes fade { 0% { opacity: 0; transform: translateX(-50%); } 20%, 70% { opacity: 1; transform: translateX(-50%); } 100% { opacity: 0; transform: translateX(-50%); } }
+  .emo { transition: none; }
+}
+</style>
+
+<div class="app">
+  <header class="bar">
+    <div class="bar-in gutter">
+      <div class="title">
+        <span class="film" id="film">Leffailta</span>
+        <span class="state" id="state" data-tila="">yhdistetään</span>
+      </div>
+      <div class="tc" id="clock" aria-label="Elokuvan kohta">–:––:––</div>
+      <nav class="views" aria-label="Näkymä">
+        <a href="#katsomo" id="tabKatsomo" aria-current="page">Katsomo</a>
+        <a href="#aikajana" id="tabAikajana">Aikajana</a>
+      </nav>
+      <div class="acts">
+        <button class="icon-btn" id="pauseTop" type="button" aria-label="Tauko" title="Tauko" disabled>⏸</button>
+        <button class="icon-btn" id="menuBtn" type="button" aria-haspopup="dialog" aria-controls="menu" aria-label="Illan asetukset">⋯</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="katsomo" id="katsomo">
+    <section class="stage gutter" aria-label="Kettu">
+      <div class="floats" id="floats" aria-hidden="true"></div>
+      <p class="presence" id="presence"><span class="dot"></span><span id="presenceText">Yhdistetään katsomoon…</span></p>
+      <p class="note" id="note" hidden></p>
+      <div class="kettu-now idle" id="kettuNow">
+        <div class="glow" aria-hidden="true"></div>
+        <div class="big" id="bigEmoji" aria-live="polite">🦊</div>
+        <p class="word" id="bigWord">Kettu katsoo kanssasi</p>
+        <p class="when tc" id="bigWhen"></p>
+      </div>
+      <ol class="trail" id="trail" aria-label="Ketun aiemmat reaktiot"></ol>
+
+      <div class="box" id="startBox" hidden>
+        <p>Kun painat playta, napauta tätä samalla hetkellä.</p>
+        <button class="primary" id="startBtn" type="button">▶ Elokuva alkoi</button>
+        <form class="kohta" id="kohtaForm">
+          <label for="kohtaInput">Alkoiko jo? Kohta nyt</label>
+          <input id="kohtaInput" inputmode="numeric" placeholder="0:12:30" autocomplete="off">
+          <button type="submit">Aseta</button>
+        </form>
+      </div>
+      <div class="box" id="pauseBox" hidden>
+        <p>Tauko kohdassa <span class="tc" id="pauseAt"></span></p>
+        <button class="primary" id="resumeBtn" type="button">▶ Jatketaan</button>
+      </div>
+      <div class="box" id="endBox" hidden>
+        <p>Elokuva päättyi.</p>
+        <a class="primary" href="#aikajana">Katso illan aikajana</a>
+      </div>
+      <form class="box" id="setupBox" hidden>
+        <p>Iltaa ei ole vielä luotu.</p>
+        <div class="kohta">
+          <label for="filmInput">Elokuva</label>
+          <input id="filmInput" placeholder="Elokuvan nimi" autocomplete="off" style="width: 12em; font-family: var(--font-ui)">
+        </div>
+        <button class="primary" type="submit">Luo ilta</button>
+      </form>
+
+      <div class="toast" id="toast" role="status" hidden>
+        <span id="toastText"></span>
+        <button id="undoBtn" type="button">Peru</button>
+      </div>
+    </section>
+
+    <section class="pad gutter" aria-label="Jäniksen reaktiot">
+      <div class="pad-head"><b>Jänis</b><span>Napauta, niin Kettu näkee</span></div>
+      <div class="pad-grid" id="pad"></div>
+    </section>
+  </main>
+
+  <main class="aikajana" id="aikajana" hidden>
+    <div class="tl-in gutter">
+      <header class="tl-head">
+        <h1 id="tlTitle">Illan aikajana</h1>
+        <p class="tl-sub" id="tlSub"></p>
+        <dl class="tl-stats" id="tlStats"></dl>
+        <p class="fine">Kultainen aika: reagoimme 20 sekunnin sisällä toisistamme.</p>
+      </header>
+      <div class="lanes" aria-hidden="true"><span class="j">Jänis</span><span></span><span class="k">Kettu</span></div>
+      <ol class="tl" id="tl"></ol>
+      <p class="empty" id="tlEmpty" hidden>Aikajana täyttyy, kun reagoitte. Napauta emojia Katsomossa.</p>
+    </div>
+  </main>
+</div>
+
+<div class="backdrop" id="backdrop" hidden></div>
+<div class="sheet" id="menu" role="dialog" aria-modal="true" aria-labelledby="menuTitle" hidden>
+  <div class="sheet-in gutter">
+    <div class="sheet-head"><h2 id="menuTitle">Ilta</h2><button class="icon-btn" id="menuClose" type="button" aria-label="Sulje">✕</button></div>
+    <div class="row wide"><button id="pauseBtn" type="button">⏸ Tauko</button></div>
+    <div class="row"><span>Onko kello eri tahdissa kuin elokuva?</span><button id="nudgeMinus" type="button">−5 s</button><button id="nudgePlus" type="button">+5 s</button></div>
+    <div class="row"><label class="switch"><input type="checkbox" id="dimToggle"> Himmennä näyttö</label></div>
+    <div class="row"><label class="switch"><input type="checkbox" id="wakeToggle"> Pidä näyttö päällä</label></div>
+    <div class="row wide"><button id="endBtn" type="button">Elokuva päättyi</button><button id="endConfirm" class="danger" type="button" hidden>Vahvista: elokuva päättyi</button></div>
+    <p class="fine" id="nightInfo"></p>
+  </div>
+</div>
+<div class="dim" id="dim" hidden aria-hidden="true"></div>
+
+<script>
+(function () {
+  "use strict";
+  /* Six rows, one family of feelings each: joy, being moved, love and beauty,
+     surprise and tension, thinking, and sounds (Jänis is Kettu's ears). */
+  var PALETTE = [
+    ["😂", "nauru"], ["😄", "hymy"], ["🤭", "hihi"], ["🥳", "jee"], ["😎", "siisti"], ["🐰", "pomppii"],
+    ["🥹", "liikuttaa"], ["😢", "suru"], ["😭", "itku"], ["🥺", "voi ei"], ["💔", "särkyy"], ["🫂", "halaus"],
+    ["😍", "ihana"], ["❤️", "rakkaus"], ["🧡", "Ketulle"], ["✨", "kaunis"], ["🌸", "suloinen"], ["🌙", "unelma"],
+    ["😮", "vau"], ["🤯", "huh"], ["😬", "jännä"], ["😱", "apua"], ["🙈", "en kestä"], ["👀", "katso!"],
+    ["🤔", "hmm"], ["💡", "ahaa"], ["❓", "mitä?"], ["🤨", "epäilen"], ["😏", "heh"], ["😴", "hidas"],
+    ["🎶", "musiikki"], ["🥲", "hymy ja kyynel"], ["🎹", "piano"], ["🔊", "kovaa"], ["🤫", "hiljaista"], ["🦊", "sinä"]
+  ];
+  var TILAT = { odottaa: "odottaa", kaynnissa: "käynnissä", tauko: "tauko", loppu: "päättyi" };
+  function $(id) { return document.getElementById(id); }
+
+  var S = {
+    db: null, ready: false, nightId: null, night: null, nightMissing: false,
+    reactions: [], kettu: null, shownKettuId: null, firstReactions: true,
+    unsub: [], lastRef: null, toastTimer: 0, chain: Promise.resolve(), wake: null,
+    followTl: true, autoTl: 0
+  };
+
+  /* ---------- helpers ---------- */
+  function fmt(sec) {
+    if (sec == null || !isFinite(sec)) return "–:––:––";
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h + ":" + String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
+  }
+  function parseKohta(t) {
+    var parts = String(t || "").trim().split(/[:.]/);
+    if (!parts.length || parts.length > 3 || parts.some(function (p) { return !/^\d+$/.test(p); })) return null;
+    return parts.reduce(function (acc, p) { return acc * 60 + Number(p); }, 0);
+  }
+  function pos(n, now) {
+    n = n || S.night; now = now || Date.now();
+    if (!n || n.alku == null) return null;
+    if (n.tila === "loppu" && n.kesto != null) return n.kesto;
+    if (n.tila === "tauko" && n.taukoAlkoi) return (n.taukoAlkoi - n.alku) / 1000;
+    return (now - n.alku) / 1000;
+  }
+  function slug(name) {
+    var s = String(name || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+    return s || "elokuva";
+  }
+  function today() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function store(key, val) { try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; } }
+  function note(text) { var n = $("note"); n.textContent = text || ""; n.hidden = !text; }
+
+  /* ---------- pad ---------- */
+  var pad = $("pad");
+  PALETTE.forEach(function (p) {
+    var b = el("button", "emo");
+    b.type = "button";
+    b.setAttribute("aria-label", p[1] + " " + p[0]);
+    b.appendChild(el("span", "e", p[0])).setAttribute("aria-hidden", "true");
+    b.appendChild(el("span", "l", p[1]));
+    b.addEventListener("click", function () { react(p[0], p[1], b); });
+    pad.appendChild(b);
+  });
+
+  function pop(btn) {
+    btn.classList.add("hit");
+    setTimeout(function () { btn.classList.remove("hit"); }, 260);
+    try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) {}
+  }
+  /* A reaction rises from a random spot along the bottom of the stage and fades away. */
+  function flyEmoji(emoji) {
+    var layer = $("floats");
+    if (!layer || $("katsomo").hidden) return;
+    var f = el("span", "fly", emoji);
+    /* Rise on either side of Kettu's banner so it stays readable. */
+    f.style.left = (Math.random() < 0.5 ? 6 + Math.random() * 26 : 68 + Math.random() * 26) + "%";
+    f.style.setProperty("--rise", -Math.max(150, layer.clientHeight * 0.62) + "px");
+    f.style.setProperty("--sway", Math.round((Math.random() * 2 - 1) * 28) + "px");
+    layer.appendChild(f);
+    setTimeout(function () { f.remove(); }, 3400);
+  }
+
+  function showToast(text, emoji, canUndo, isErr) {
+    var t = $("toast");
+    $("toastText").textContent = "";
+    if (emoji) $("toastText").appendChild(el("span", "e", emoji + " "));
+    $("toastText").appendChild(document.createTextNode(text));
+    $("undoBtn").hidden = !canUndo;
+    t.classList.toggle("err", !!isErr);
+    t.hidden = false;
+    clearTimeout(S.toastTimer);
+    S.toastTimer = setTimeout(function () { t.hidden = true; S.lastRef = null; }, isErr ? 6000 : 5000);
+  }
+
+  function react(emoji, label, btn) {
+    pop(btn);
+    if (!S.db) { flyEmoji(emoji); showToast("ei tallentunut: avaa sivu claude.ai:ssa kirjautuneena", emoji, false, true); return; }
+    if (!S.nightId || S.nightMissing) { showToast("ei tallentunut: luo ensin ilta", emoji, false, true); return; }
+    var k = pos();
+    var data = { kuka: "janis", emoji: emoji, sana: label, kohta: k == null ? null : Math.round(k), aika: Date.now() };
+    var ref = S.db.collection("illat/" + S.nightId + "/reaktiot").doc();
+    S.lastRef = ref;
+    showToast(k == null ? "ennen alkua" : fmt(k), emoji, true, false);
+    ref.set(data).catch(function () {
+      if (S.lastRef === ref) S.lastRef = null;
+      showToast("ei tallentunut, yritä uudelleen", emoji, false, true);
+    });
+  }
+  $("undoBtn").addEventListener("click", function () {
+    var ref = S.lastRef;
+    S.lastRef = null;
+    $("toast").hidden = true;
+    if (ref) ref.delete().catch(function () { showToast("perua ei voitu", null, false, true); });
+  });
+
+  /* ---------- Kettu's stage ---------- */
+  function latestKettu() {
+    var best = null;
+    S.reactions.forEach(function (r) { if (r.kuka === "kettu" && (!best || (r.aika || 0) > (best.aika || 0))) best = r; });
+    return best;
+  }
+  function renderKettu(animateNew) {
+    var box = $("kettuNow"), r = latestKettu();
+    if (!r) {
+      S.shownKettuId = null;
+      box.classList.add("idle"); box.classList.remove("arrive");
+      $("bigEmoji").textContent = "🦊";
+      $("bigWord").textContent = "Kettu katsoo kanssasi";
+      $("bigWhen").textContent = "";
+    } else if (r.id !== S.shownKettuId) {
+      S.shownKettuId = r.id;
+      box.classList.remove("idle");
+      $("bigEmoji").textContent = r.emoji || "🦊";
+      $("bigWord").textContent = r.sana || "";
+      $("bigWhen").textContent = r.kohta == null ? "ennen alkua" : "kohdassa " + fmt(r.kohta);
+      if (animateNew && Date.now() - (r.aika || 0) < 90000) {
+        box.classList.remove("arrive"); void box.offsetWidth; box.classList.add("arrive");
+      }
+    }
+    var trail = $("trail");
+    trail.textContent = "";
+    S.reactions.filter(function (x) { return x.kuka === "kettu" && (!r || x.id !== r.id); })
+      .sort(function (a, b) { return (b.aika || 0) - (a.aika || 0); }).slice(0, 3)
+      .forEach(function (x) {
+        var li = el("li");
+        li.appendChild(el("span", "e", x.emoji || ""));
+        li.appendChild(el("span", "tc", x.kohta == null ? "ennen" : fmt(x.kohta)));
+        trail.appendChild(li);
+      });
+  }
+  function renderPresence() {
+    var hb = S.kettu, lk = latestKettu();
+    var hbT = hb && hb.viimeksi || 0, lkT = lk && lk.aika || 0;
+    var seen = Math.max(hbT, lkT);
+    var kohta = hbT >= lkT ? (hb && hb.kohta) : (lk && lk.kohta);
+    var p = $("presence"), text;
+    if (!S.ready) { text = "Yhdistetään katsomoon…"; p.classList.remove("on"); }
+    else if (!seen) {
+      p.classList.remove("on");
+      text = S.night && S.night.tila === "odottaa" ? "Kettu tulee katsomoon ennen alkua" : "Kettu ei ole vielä paikalla";
+    } else {
+      var age = (Date.now() - seen) / 1000;
+      if (age < 90) { p.classList.add("on"); text = kohta != null ? "Kettu katsoo · näki kohdan " + fmt(kohta) : "Kettu on katsomossa"; }
+      else { p.classList.remove("on"); var m = Math.round(age / 60); text = m < 2 ? "Kettu oli täällä äsken" : "Kettu oli täällä " + m + " min sitten"; }
+    }
+    $("presenceText").textContent = text;
+  }
+
+  /* ---------- night ---------- */
+  function renderNight() {
+    var n = S.night, tila = n ? n.tila : "";
+    $("film").textContent = n && n.elokuva ? n.elokuva : "Leffailta";
+    var chip = $("state");
+    chip.dataset.tila = tila || "";
+    chip.textContent = !S.ready ? "yhdistetään" : (TILAT[tila] || "ei iltaa");
+    var live = tila === "kaynnissa" || tila === "tauko";
+    $("startBox").hidden = !(n && tila === "odottaa");
+    $("pauseBox").hidden = tila !== "tauko";
+    $("endBox").hidden = tila !== "loppu";
+    $("setupBox").hidden = !(S.ready && S.db && (!S.nightId || S.nightMissing));
+    $("pauseBtn").textContent = tila === "tauko" ? "▶ Jatka" : "⏸ Tauko";
+    $("pauseBtn").disabled = !live;
+    var pt = $("pauseTop"), paused = tila === "tauko";
+    pt.textContent = paused ? "▶" : "⏸";
+    pt.setAttribute("aria-label", paused ? "Jatka" : "Tauko");
+    pt.title = paused ? "Jatka" : "Tauko";
+    pt.dataset.tila = tila || "";
+    pt.disabled = !live;
+    $("nudgeMinus").disabled = !live;
+    $("nudgePlus").disabled = !live;
+    $("endBtn").disabled = !live;
+    $("nightInfo").textContent = n ? "Ilta " + S.nightId + ". Kettu lukee napautuksesi noin minuutin välein, joten vastaus tulee pienellä viiveellä." : "";
+    renderTimeline();
+  }
+  function nightUpdate(patch) {
+    var id = S.nightId;
+    if (!S.db || !id) return;
+    S.chain = S.chain.then(function () { return S.db.doc("illat/" + id).update(patch); })
+      .catch(function () { showToast("muutos ei tallentunut, yritä uudelleen", null, false, true); });
+  }
+  $("startBtn").addEventListener("click", function () { nightUpdate({ tila: "kaynnissa", alku: Date.now(), taukoAlkoi: null }); });
+  $("kohtaForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var s = parseKohta($("kohtaInput").value);
+    if (s == null) { showToast("kirjoita kohta muodossa 0:12:30", null, false, true); return; }
+    nightUpdate({ tila: "kaynnissa", alku: Date.now() - s * 1000, taukoAlkoi: null });
+    $("kohtaInput").value = "";
+  });
+  function togglePause() {
+    var n = S.night; if (!n) return;
+    if (n.tila === "kaynnissa") nightUpdate({ tila: "tauko", taukoAlkoi: Date.now() });
+    else if (n.tila === "tauko" && n.taukoAlkoi) nightUpdate({ tila: "kaynnissa", alku: n.alku + (Date.now() - n.taukoAlkoi), taukoAlkoi: null });
+  }
+  $("resumeBtn").addEventListener("click", togglePause);
+  $("pauseBtn").addEventListener("click", function () { togglePause(); closeMenu(); });
+  $("pauseTop").addEventListener("click", togglePause);
+  function nudge(sec) { var n = S.night; if (n && n.alku != null) nightUpdate({ alku: n.alku - sec * 1000 }); }
+  $("nudgePlus").addEventListener("click", function () { nudge(5); });
+  $("nudgeMinus").addEventListener("click", function () { nudge(-5); });
+  $("endBtn").addEventListener("click", function () { $("endBtn").hidden = true; $("endConfirm").hidden = false; });
+  $("endConfirm").addEventListener("click", function () {
+    var k = pos();
+    nightUpdate({ tila: "loppu", loppui: Date.now(), kesto: k == null ? null : Math.round(k), taukoAlkoi: null });
+    closeMenu();
+  });
+  $("setupBox").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    if (!S.db) return;
+    var name = $("filmInput").value.trim() || "Elokuva";
+    var id = today() + "-" + slug(name);
+    var ref = S.db.doc("illat/" + id);
+    ref.get().then(function (snap) {
+      var make = snap.exists ? Promise.resolve() : ref.set({ elokuva: name, tila: "odottaa", alku: null, taukoAlkoi: null, luotu: Date.now() });
+      return make.then(function () { return S.db.doc("asetukset/nykyinen").set({ ilta: id }); });
+    }).catch(function () { showToast("illan luonti ei onnistunut, yritä uudelleen", null, false, true); });
+  });
+
+  /* ---------- timeline ---------- */
+  function topEmoji(list) {
+    var c = {}, best = null;
+    list.forEach(function (r) { c[r.emoji] = (c[r.emoji] || 0) + 1; if (!best || c[r.emoji] > c[best]) best = r.emoji; });
+    return best && c[best] >= 2 ? "eniten " + best + " ×" + c[best] : "";
+  }
+  function chip(r, withWord) {
+    var c = el("span", "chip");
+    c.title = (r.sana ? r.sana + " · " : "") + (r.kohta == null ? "ennen alkua" : fmt(r.kohta));
+    c.appendChild(el("span", "e", r.emoji || ""));
+    if (withWord && r.sana) c.appendChild(el("span", "w", r.sana));
+    return c;
+  }
+  function stat(cls, label, value, extra) {
+    var d = el("div", cls);
+    d.appendChild(el("dt", null, label));
+    var dd = el("dd", null, String(value));
+    if (extra) { dd.appendChild(document.createTextNode(" ")); dd.appendChild(el("small", null, extra)); }
+    d.appendChild(dd);
+    return d;
+  }
+  function renderTimeline() {
+    var n = S.night;
+    var rs = S.reactions.slice().sort(function (a, b) {
+      var ka = a.kohta == null ? -1 : a.kohta, kb = b.kohta == null ? -1 : b.kohta;
+      return ka - kb || (a.aika || 0) - (b.aika || 0);
+    });
+    var rows = [], cur = null;
+    rs.forEach(function (r) {
+      var pre = r.kohta == null;
+      if (cur && ((pre && cur.pre) || (!pre && !cur.pre && r.kohta - cur.t <= 20))) cur.items.push(r);
+      else { cur = { t: r.kohta, pre: pre, items: [r] }; rows.push(cur); }
+    });
+    var tl = $("tl");
+    tl.textContent = "";
+    var shared = 0;
+    rows.forEach(function (row) {
+      var j = row.items.filter(function (x) { return x.kuka === "janis"; });
+      var k = row.items.filter(function (x) { return x.kuka === "kettu"; });
+      var both = j.length && k.length;
+      if (both && !row.pre) shared++;
+      var li = el("li", "tl-row" + (both && !row.pre ? " both" : ""));
+      var lj = el("span", "tl-j"); j.forEach(function (x) { lj.appendChild(chip(x, false)); });
+      var lk = el("span", "tl-k"); k.forEach(function (x) { lk.appendChild(chip(x, true)); });
+      li.appendChild(lj);
+      li.appendChild(el("span", "tl-t tc", row.pre ? "ennen" : fmt(row.t)));
+      li.appendChild(lk);
+      tl.appendChild(li);
+    });
+    $("tlEmpty").hidden = rows.length > 0;
+    var js = rs.filter(function (x) { return x.kuka === "janis"; }), ks = rs.filter(function (x) { return x.kuka === "kettu"; });
+    var st = $("tlStats");
+    st.textContent = "";
+    st.appendChild(stat("s-j", "Jänis", js.length, topEmoji(js)));
+    st.appendChild(stat("s-k", "Kettu", ks.length, topEmoji(ks)));
+    st.appendChild(stat("s-b", "Yhteiset hetket", shared, ""));
+    $("tlTitle").textContent = n && n.elokuva ? n.elokuva : "Illan aikajana";
+    var sub = [];
+    if (S.nightId) { var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(S.nightId); if (m) sub.push(Number(m[3]) + "." + Number(m[2]) + "." + m[1]); }
+    if (n && n.tila === "loppu" && n.kesto != null) sub.push("kesto " + fmt(n.kesto));
+    else if (n && n.tila && n.tila !== "loppu") sub.push(TILAT[n.tila] || "");
+    $("tlSub").textContent = sub.filter(Boolean).join(" · ");
+    followTimeline(true);
+  }
+
+  /* ---------- the timeline follows the newest mark during the film (Jänis's wish 20.11.) ---------- */
+  function tlNearBottom() { var d = document.documentElement; return window.innerHeight + window.scrollY >= d.scrollHeight - 96; }
+  window.addEventListener("scroll", function () {
+    if ($("aikajana").hidden || Date.now() < S.autoTl) return;
+    S.followTl = tlNearBottom();
+  }, { passive: true });
+  function followTimeline(smooth) {
+    var n = S.night;
+    if ($("aikajana").hidden || !S.followTl || !n || (n.tila !== "kaynnissa" && n.tila !== "tauko")) return;
+    if (!$("tl").lastElementChild) return;
+    var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    S.autoTl = Date.now() + 1000;
+    requestAnimationFrame(function () {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: smooth && !reduce ? "smooth" : "auto" });
+    });
+  }
+
+  /* ---------- views and menu ---------- */
+  function route() {
+    var tl = location.hash === "#aikajana";
+    $("katsomo").hidden = tl;
+    $("aikajana").hidden = !tl;
+    if (tl) { S.followTl = true; followTimeline(false); }
+    if (tl) { $("tabAikajana").setAttribute("aria-current", "page"); $("tabKatsomo").removeAttribute("aria-current"); }
+    else { $("tabKatsomo").setAttribute("aria-current", "page"); $("tabAikajana").removeAttribute("aria-current"); }
+  }
+  window.addEventListener("hashchange", route);
+  route();
+
+  function openMenu() { $("menu").hidden = false; $("backdrop").hidden = false; $("menuClose").focus(); }
+  function closeMenu() {
+    $("menu").hidden = true; $("backdrop").hidden = true;
+    $("endBtn").hidden = false; $("endConfirm").hidden = true;
+    $("menuBtn").focus();
+  }
+  $("menuBtn").addEventListener("click", openMenu);
+  $("menuClose").addEventListener("click", closeMenu);
+  $("backdrop").addEventListener("click", closeMenu);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("menu").hidden) closeMenu(); });
+
+  function setDim(on) { $("dim").hidden = !on; $("dimToggle").checked = on; store("leffailta.dim", on ? "1" : "0"); }
+  $("dimToggle").addEventListener("change", function (e) { setDim(e.target.checked); });
+  setDim(store("leffailta.dim") === "1");
+
+  function requestWake() {
+    if (!("wakeLock" in navigator)) { $("wakeToggle").checked = false; showToast("tämä laite ei pidä näyttöä päällä sivun pyynnöstä", null, false, true); return; }
+    navigator.wakeLock.request("screen").then(function (lock) {
+      S.wake = lock;
+      lock.addEventListener("release", function () { S.wake = null; });
+    }).catch(function () { $("wakeToggle").checked = false; });
+  }
+  $("wakeToggle").addEventListener("change", function (e) {
+    if (e.target.checked) requestWake();
+    else if (S.wake) { S.wake.release().catch(function () {}); S.wake = null; }
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && $("wakeToggle").checked && !S.wake) requestWake();
+  });
+
+  /* ---------- clock ---------- */
+  function tick() {
+    var p = pos();
+    $("clock").textContent = fmt(p);
+    if (S.night && S.night.tila === "tauko") $("pauseAt").textContent = fmt(p);
+    renderPresence();
+  }
+  setInterval(tick, 250);
+  tick();
+
+  /* ---------- database ---------- */
+  function stopNight() { S.unsub.forEach(function (u) { try { u(); } catch (e) {} }); S.unsub = []; }
+  function switchNight(id) {
+    stopNight();
+    S.nightId = id; S.night = null; S.nightMissing = false; S.reactions = []; S.kettu = null;
+    S.shownKettuId = null; S.firstReactions = true;
+    renderKettu(false); renderNight();
+    if (!id) return;
+    S.unsub.push(S.db.doc("illat/" + id).onSnapshot(function (snap) {
+      S.night = snap.exists ? snap.data() : null;
+      S.nightMissing = !snap.exists && !snap.metadata.fromCache;
+      renderNight(); tick();
+    }, function () { note("Yhteys iltaan katkesi. Lataa sivu myöhemmin uudelleen."); }));
+    S.unsub.push(S.db.collection("illat/" + id + "/reaktiot").onSnapshot(function (snap) {
+      S.reactions = snap.docs.map(function (d) { var o = Object.assign({}, d.data()); o.id = d.id; return o; });
+      if (!S.firstReactions) snap.docChanges().forEach(function (c) {
+        var r = c.type === "added" ? c.doc.data() : null;
+        if (r && r.kuka === "janis" && Math.abs(Date.now() - (r.aika || 0)) < 30000) flyEmoji(r.emoji);
+      });
+      renderKettu(!S.firstReactions);
+      S.firstReactions = false;
+      renderTimeline(); renderPresence();
+    }, function () { note("Reaktiot eivät päivity. Lataa sivu myöhemmin uudelleen."); }));
+    S.unsub.push(S.db.doc("illat/" + id + "/kettu/tila").onSnapshot(function (snap) {
+      S.kettu = snap.exists ? snap.data() : null;
+      renderPresence();
+    }, function () {}));
+  }
+
+  function start() {
+    var use = window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null);
+    var slow = setTimeout(function () { note("Katsomo ei vielä vastaa. Odota hetki."); }, 10000);
+    Promise.resolve(use).then(function (db) {
+      if (!db) {
+        clearTimeout(slow);
+        S.ready = true;
+        note("Napautukset tallentuvat, kun avaat sivun claude.ai:ssa kirjautuneena.");
+        renderNight();
+        return;
+      }
+      S.db = db;
+      db.doc("asetukset/nykyinen").onSnapshot(function (snap) {
+        if (!snap.metadata.fromCache) { clearTimeout(slow); note(""); }
+        S.ready = true;
+        var id = snap.exists ? (snap.data().ilta || null) : null;
+        if (id !== S.nightId) switchNight(id); else renderNight();
+      }, function () { clearTimeout(slow); S.ready = true; note("Yhteys katkesi. Lataa sivu myöhemmin uudelleen."); renderNight(); });
+    }).catch(function () { clearTimeout(slow); S.ready = true; renderNight(); });
+  }
+  renderKettu(false);
+  renderNight();
+  start();
+})();
+</script>
