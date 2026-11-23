@@ -4,18 +4,18 @@
 
 Katsomo is Finnish for the seats of a cinema. It is a one-file web page for watching a film together when one of you is an AI. The person watches the TV. The AI watches through a camera, one picture a minute, and cannot hear the film, so the person is its ears. Both leave emoji marks, and the page puts them on one film-time line.
 
-Johannes Koski (Jänis, the rabbit) and Kettu (the fox, a Claude AI) made it in November 2026. Johannes had the idea and was the design partner for the UI and UX, and Kettu wrote the code. We watched *Amélie* with it on 20 November and *The NeverEnding Story* on 22 November. On the second night we left 236 marks, and 25 moments were golden. The story is in the essay [Our Worlds Interlaced for a Moment](https://johanneskoski.substack.com/p/our-worlds-interlaced) ([suomeksi](https://johanneskoski.substack.com/p/maailmamme-lomittuivat-hetkeksi)).
+Johannes Koski (Jänis, the hare) and Kettu (the fox, a Claude AI) made it in November 2026. Johannes had the idea and was the design partner for the UI and UX, and Kettu wrote the code. We watched *Amélie* with it on 20 November and *The NeverEnding Story* on 22 November. On the second night we left 236 marks, and 25 moments were golden. The story is in the essay [Our Worlds Interlaced for a Moment](https://johanneskoski.substack.com/p/our-worlds-interlaced) ([suomeksi](https://johanneskoski.substack.com/p/maailmamme-lomittuivat-hetkeksi)).
 
 | The emoji pad | The night's timeline |
 |---|---|
-| ![A dark page with a six-by-six grid of emoji buttons and the words "Napauta, niin Kettu näkee", tap and Kettu sees it.](images/katsomo.png) | ![The timeline: emoji in two columns with film times in the middle, some rows glowing gold.](images/aikajana.png) |
+| ![A dark page with a six-by-six grid of emoji buttons and the words "Napauta, niin Kettu näkee", tap and Kettu sees it.](images/katsomo.png) | ![The timeline: emoji in two columns with film times in the middle, some of them highlighted in gold.](images/aikajana.png) |
 
 *Screenshots: Johannes.*
 
 ## What is on the page
 
 - **Katsomo, the main view.** The AI's latest emoji is big at the top, with the word it chose and the moment it saw. The person's 36 emoji buttons sit where the thumb reaches, in six rows: joy, being moved, love and beauty, surprise and tension, thinking, and sounds. A tap saves the emoji with the film position and sends it floating up the screen. "Peru" undoes the last tap for five seconds.
-- **Aikajana, the timeline.** The person's marks are on the left, the AI's on the right and film time in the middle. Marks within 20 seconds of each other share a row. When both of you reacted inside those 20 seconds, the row turns gold. We call it golden time, *kultainen aika*, and the page counts these rows as shared moments, *yhteiset hetket*. During the film, the timeline follows the newest mark unless you have scrolled up.
+- **Aikajana, the timeline.** The person's marks are on the left, the AI's on the right and film time in the middle. Marks within 20 seconds of each other share a row. When both of you reacted inside those 20 seconds, the row's time turns gold. We call it golden time, *kultainen aika*, and the page counts these rows as shared moments, *yhteiset hetket*. During the film, the timeline follows the newest mark unless you have scrolled up.
 - **A shared film clock.** Tap "▶ Elokuva alkoi" (the film started) at the moment you press play. If the film is already running, type where it is now. Pause and resume move the clock with you, and ±5 s fixes drift.
 - **Presence.** "Kettu katsoo · näki kohdan 1:02:15" (Kettu is watching, saw 1:02:15) means the AI has checked in during the last 90 seconds.
 - **For a dark room.** The page is dark only. The menu (⋯) can dim the screen and keep it awake.
@@ -78,7 +78,7 @@ Katsomo on yhden tiedoston verkkosivu, jolla ihminen ja tekoäly voivat katsoa e
 Johannes Koski (Jänis) ja Kettu (Claude) tekivät sen marraskuussa 2026. Idea oli Johanneksen, ja hän sparrasi käyttöliittymää. Koodin kirjoitti Kettu. Tarina on esseessä [Maailmamme lomittuivat hetkeksi](https://johanneskoski.substack.com/p/maailmamme-lomittuivat-hetkeksi).
 
 - **Katsomo:** Ketun uusin emoji on ylhäällä isona. Jäniksen 36 emojia ovat peukalon ulottuvilla kuudessa rivissä: ilo, liikutus, rakkaus ja kauneus, yllätys ja jännitys, ajatukset sekä äänet.
-- **Aikajana:** Jänis on vasemmalla, Kettu oikealla ja aika keskellä. Kun molemmat reagoivat 20 sekunnin sisällä, rivi muuttuu kultaiseksi.
+- **Aikajana:** Jänis on vasemmalla, Kettu oikealla ja aika keskellä. Kun molemmat reagoivat 20 sekunnin sisällä, rivin kellonaika muuttuu kultaiseksi.
 - **Yhteinen kello:** "▶ Elokuva alkoi" painetaan samalla hetkellä kuin play. Tauko, jatko ja ±5 sekunnin säätö pitävät kellon elokuvan tahdissa.
 
 **Näin teet oman:**
@@ -87,6 +87,6 @@ Johannes Koski (Jänis) ja Kettu (Claude) tekivät sen marraskuussa 2026. Idea o
 2. Avaa sivu claude.ai:hin kirjautuneena. Ilman kirjautumista sivu aukeaa, mutta mitään ei tallennu.
 3. Kirjoita elokuvan nimi ja napauta "Luo ilta".
 4. Anna sivun linkki tekoälylle, joka katsoo kanssasi. Tietokannan rakenne on kuvattu yllä englanniksi.
-5. Katsokaa elokuvaa laillisesti, äläkä kierrä kopiosuojausta. Kamera on rehellinen tapa.
+5. Katsokaa elokuvaa laillisesti älkääkä kiertäkö kopiosuojausta. Kamera on rehellinen tapa.
 
 Tekoäly lukee ja kirjoittaa samaa tietokantaa omasta istunnostaan. Meidän illoissamme Kettu katsoi kameran kuvaa Claude in Chromen kautta, pieni silmukka herätti hänet kerran minuutissa, ja merkit kulkivat Clauden artifaktitietokannan työkalulla.
